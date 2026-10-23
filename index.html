@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Faz 0 Test</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Faz 0">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b1220">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: max(16px, env(safe-area-inset-top)) 16px 40px; background: #0b1220; color: #e6edf7;
+         font: 15px/1.45 -apple-system, system-ui, sans-serif; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: #8fa1b8; margin: 0 0 16px; font-size: 13px; }
+  .card { background: #121b2e; border: 1px solid #1f2c47; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+  .card h2 { font-size: 15px; margin: 0 0 8px; }
+  .card p { margin: 0 0 10px; color: #a9b8cc; font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  td { padding: 4px 0; vertical-align: top; border-bottom: 1px solid #1a2640; }
+  td:first-child { color: #8fa1b8; width: 42%; padding-right: 8px; }
+  .good { color: #5fd38d; } .bad { color: #ff7a7a; } .warn { color: #ffc766; }
+  button, select { font: inherit; border-radius: 10px; border: 1px solid #2a3b5e; background: #1a2744; color: #e6edf7;
+                   padding: 10px 12px; margin: 0 6px 8px 0; }
+  button.primary { background: #2563eb; border-color: #2563eb; }
+  button.danger { background: #3a1a1f; border-color: #6a2a33; }
+  button:disabled { opacity: .45; }
+  progress { width: 100%; height: 10px; }
+  pre { background: #080e1a; border: 1px solid #1a2640; border-radius: 10px; padding: 10px; margin: 0;
+        max-height: 320px; overflow: auto; white-space: pre-wrap; word-break: break-word; font-size: 12px; }
+  video { width: 100%; border-radius: 10px; margin-top: 8px; display: none; background: #000; }
+</style>
+</head>
+<body>
+
+<h1>Faz 0: Depolama Testi</h1>
+<p class="sub">Gizli Klasörler projesi için iPhone ölçümleri. Hiçbir veri bir yere gönderilmez.</p>
+
+<div class="card">
+  <h2>1. Cihaz ve depolama durumu</h2>
+  <table id="info"></table>
+  <div style="margin-top:10px">
+    <button id="bPersist" class="primary">Kalıcı depolama iste (persist)</button>
+    <button id="bRefresh">Yenile</button>
+  </div>
+  <p id="standaloneWarn" class="warn" style="display:none">Şu an Safari sekmesindesin. Gerçek sonuçlar için sayfayı ana ekrana ekleyip oradan aç (Paylaş &rarr; Ana Ekrana Ekle).</p>
+</div>
+
+<div class="card">
+  <h2>2. Büyük dosya yazma testi</h2>
+  <p>Seçilen boyutta sahte veri yazar, geri okuyup doğrular, sonra siler. 3 GB testi birkaç dakika sürebilir; ekranı açık tut.</p>
+  <select id="size">
+    <option value="100">100 MB</option>
+    <option value="500">500 MB</option>
+    <option value="1024">1 GB</option>
+    <option value="3072" selected>3 GB</option>
+  </select><br>
+  <button id="bOpfs" class="primary">OPFS testi</button>
+  <button id="bIdb" class="primary">IndexedDB testi</button>
+  <progress id="prog" value="0" max="1"></progress>
+</div>
+
+<div class="card">
+  <h2>3. Şifreleme hızı</h2>
+  <p>Parola türetme süresi ve AES-GCM hızı.</p>
+  <button id="bCrypto" class="primary">Şifreleme testi</button>
+</div>
+
+<div class="card">
+  <h2>4. Video testi (en önemli)</h2>
+  <p>Kitaplığından bir video seç. Parçalı şifrelenip OPFS'e yazılır, sonra çözülüp oynatılır. En büyük videonla dene (varsa 1 GB+). Uygulama kapanır veya yeniden yüklenirse bu da bir bulgudur, bana söyle.</p>
+  <input type="file" id="vfile" accept="video/*"><br><br>
+  <button id="bVideo" class="primary">Videoyu şifrele ve oynat</button>
+  <video id="vid" controls playsinline></video>
+</div>
+
+<div class="card">
+  <h2>5. Kalıcılık testi</h2>
+  <p>100 MB'lık bir işaret dosyası oluşturur ve saklar. Telefonu yeniden başlattıktan sonra, 3 gün ve 8 gün sonra "Kontrol et" ile hâlâ durup durmadığına bak. Bu testi bitirene kadar sayfayı ana ekrandan sil/temizleme.</p>
+  <button id="bKeep" class="primary">İşaret dosyası oluştur</button>
+  <button id="bKeepCheck">Kontrol et</button>
+</div>
+
+<div class="card">
+  <h2>Sonuçlar</h2>
+  <button id="bCopy">Sonuçları kopyala</button>
+  <button id="bClean" class="danger">Test verilerini temizle</button>
+  <pre id="log"></pre>
+</div>
+
+<script type="text/plain" id="wsrc">
+const CH = 8 * 1024 * 1024;
+const log = m => postMessage({ type: 'log', m });
+const prog = p => postMessage({ type: 'prog', p });
+const done = o => postMessage(Object.assign({ type: 'done' }, o));
+
+function makeBase(n) {
+  const b = new Uint8Array(n);
+  for (let o = 0; o < n; o += 65536) crypto.getRandomValues(b.subarray(o, Math.min(o + 65536, n)));
+  return b;
+}
+
+async function opfsTest(d) {
+  const total = d.mb * 1024 * 1024, n = Math.ceil(total / CH);
+  const dir = await navigator.storage.getDirectory();
+  const name = d.keep ? 'fz0_keep.bin' : 'fz0_test.bin';
+  const base = makeBase(CH), dv = new DataView(base.buffer);
+  let ah;
+  try {
+    const fh = await dir.getFileHandle(name, { create: true });
+    ah = await fh.createSyncAccessHandle();
+  } catch (e) { log('HATA: dosya açılamadı: ' + e.name + ' - ' + e.message); return done({ ok: false }); }
+
+  let i = 0, ok = true;
+  const t0 = performance.now();
+  try {
+    ah.truncate(0);
+    for (i = 0; i < n; i++) {
+      dv.setUint32(0, i);
+      const w = ah.write(base, { at: i * CH });
+      if (w !== CH) throw new Error('kısa yazma ' + w + '/' + CH);
+      if (i % 8 === 7) ah.flush();
+      prog((i + 1) / n);
+    }
+    ah.flush();
+  } catch (e) {
+    ok = false;
+    log('HATA yazma sırasında (parça ' + (i + 1) + '/' + n + ', ~' + Math.round(i * CH / 1048576) + ' MB): ' + e.name + ' - ' + e.message);
+  }
+  const wt = (performance.now() - t0) / 1000;
+  if (ok) log('Yazma tamam: ' + d.mb + ' MB, ' + wt.toFixed(1) + ' sn, ' + (d.mb / wt).toFixed(0) + ' MB/sn');
+
+  let bad = 0;
+  const written = ok ? n : i;
+  try {
+    log('Dosya boyutu: ' + Math.round(ah.getSize() / 1048576) + ' MB');
+    const buf = new Uint8Array(CH), bv = new DataView(buf.buffer);
+    for (let k = 0; k < written; k++) {
+      const r = ah.read(buf, { at: k * CH });
+      if (r !== CH || bv.getUint32(0) !== k) { bad++; continue; }
+      for (let o = 4096; o < CH; o += 4096) { if (buf[o] !== base[o]) { bad++; break; } }
+      prog((k + 1) / written);
+    }
+    log(bad === 0 ? 'Doğrulama: tüm parçalar doğru.' : 'Doğrulama: ' + bad + ' BOZUK PARÇA!');
+  } catch (e) { log('Doğrulama hatası: ' + e.name + ' - ' + e.message); bad = -1; }
+  try { ah.close(); } catch (e) {}
+
+  if (d.keep && ok) {
+    const jh = await dir.getFileHandle('fz0_keep.json', { create: true });
+    const jah = await jh.createSyncAccessHandle();
+    const txt = new TextEncoder().encode(JSON.stringify({ created: Date.now(), n: n, CH: CH, mb: d.mb }));
+    jah.truncate(0); jah.write(txt, { at: 0 }); jah.flush(); jah.close();
+    log('İşaret dosyası oluşturuldu. Bu testi bitirene kadar silme.');
+  } else {
+    try { await dir.removeEntry(name); } catch (e) {}
+    log('Test dosyası silindi.');
+  }
+  done({ ok: ok && bad === 0 });
+}
+
+async function keepCheck() {
+  const dir = await navigator.storage.getDirectory();
+  let meta;
+  try {
+    const jf = await (await dir.getFileHandle('fz0_keep.json')).getFile();
+    meta = JSON.parse(await jf.text());
+  } catch (e) { log('İŞARET DOSYASI BULUNAMADI (silinmiş olabilir): ' + e.name); return done({ ok: false }); }
+  const age = (Date.now() - meta.created) / 3600000;
+  log('İşaret dosyası bulundu. Yaşı: ' + age.toFixed(1) + ' saat (' + (age / 24).toFixed(1) + ' gün)');
+  let ah;
+  try {
+    const fh = await dir.getFileHandle('fz0_keep.bin');
+    ah = await fh.createSyncAccessHandle();
+    const size = ah.getSize();
+    log('Boyut: ' + Math.round(size / 1048576) + ' MB (beklenen ' + meta.mb + ' MB)');
+    const ref = new Uint8Array(CH), buf = new Uint8Array(CH);
+    const rv = new DataView(ref.buffer), bv = new DataView(buf.buffer);
+    ah.read(ref, { at: 0 });
+    let bad = 0;
+    for (let k = 0; k < meta.n; k++) {
+      const r = ah.read(buf, { at: k * CH });
+      if (r !== CH || bv.getUint32(0) !== k) { bad++; continue; }
+      for (let o = 4096; o < CH; o += 4096) { if (buf[o] !== ref[o]) { bad++; break; } }
+    }
+    log(bad === 0 ? 'İçerik doğrulandı: veri sağlam.' : 'İçerikte ' + bad + ' bozuk parça var!');
+    done({ ok: bad === 0 });
+  } catch (e) { log('Okuma hatası: ' + e.name + ' - ' + e.message); done({ ok: false }); }
+  finally { try { ah && ah.close(); } catch (e) {} }
+}
+
+async function videoTest(d) {
+  const file = d.file;
+  log('Video: ' + (file.size / 1048576).toFixed(0) + ' MB, tür: ' + (file.type || '?'));
+  const dir = await navigator.storage.getDirectory();
+  const fh = await dir.getFileHandle('fz0_video.enc', { create: true });
+  const ah = await fh.createSyncAccessHandle();
+  try {
+    ah.truncate(0);
+    const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+    const n = Math.ceil(file.size / CH), lens = [];
+    let pos = 0;
+    const iv = i => { const a = new Uint8Array(12); new DataView(a.buffer).setUint32(8, i); return a; };
+    let t0 = performance.now();
+    for (let i = 0; i < n; i++) {
+      const pt = await file.slice(i * CH, (i + 1) * CH).arrayBuffer();
+      const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv(i) }, key, pt));
+      const w = ah.write(ct, { at: pos });
+      if (w !== ct.length) throw new Error('kısa yazma');
+      lens.push(ct.length); pos += ct.length;
+      prog((i + 1) / n * 0.5);
+    }
+    ah.flush();
+    let t = (performance.now() - t0) / 1000;
+    log('Şifreleme + yazma: ' + t.toFixed(1) + ' sn (' + (file.size / 1048576 / t).toFixed(0) + ' MB/sn), ' + n + ' parça');
+
+    t0 = performance.now();
+    const parts = [];
+    pos = 0;
+    for (let i = 0; i < n; i++) {
+      const buf = new Uint8Array(lens[i]);
+      ah.read(buf, { at: pos });
+      parts.push(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv(i) }, key, buf));
+      pos += lens[i];
+      prog(0.5 + (i + 1) / n * 0.5);
+    }
+    t = (performance.now() - t0) / 1000;
+    log('Okuma + çözme: ' + t.toFixed(1) + ' sn (' + (file.size / 1048576 / t).toFixed(0) + ' MB/sn)');
+    log('Blob oluşturuluyor... (uygulama burada kapanırsa bellek yetmedi demektir)');
+    const blob = new Blob(parts, { type: file.type || 'video/mp4' });
+    parts.length = 0;
+    ah.close();
+    try { await dir.removeEntry('fz0_video.enc'); } catch (e) {}
+    postMessage({ type: 'done', ok: true, blob: blob });
+  } catch (e) {
+    log('VİDEO TESTİ HATASI: ' + e.name + ' - ' + e.message);
+    try { ah.close(); } catch (x) {}
+    try { await dir.removeEntry('fz0_video.enc'); } catch (x) {}
+    done({ ok: false });
+  }
+}
+
+async function clean() {
+  const dir = await navigator.storage.getDirectory();
+  const names = [];
+  for await (const [name] of dir.entries()) { if (name.indexOf('fz0_') === 0) names.push(name); }
+  for (const nm of names) { try { await dir.removeEntry(nm); } catch (e) { log('Silinemedi: ' + nm + ' ' + e.message); } }
+  log('OPFS temizlendi (' + names.length + ' dosya).');
+  done({ ok: true });
+}
+
+onmessage = async e => {
+  const d = e.data;
+  try {
+    if (d.cmd === 'opfs') await opfsTest(d);
+    else if (d.cmd === 'keepCheck') await keepCheck();
+    else if (d.cmd === 'video') await videoTest(d);
+    else if (d.cmd === 'clean') await clean();
+  } catch (err) {
+    log('WORKER HATASI: ' + err.name + ' - ' + err.message);
+    done({ ok: false });
+  }
+};
+</script>
+
+<script>
+const $ = id => document.getElementById(id);
+const logEl = $('log');
+const CH = 8 * 1024 * 1024;
+let busy = false, curRes = null, wakeLock = null, vidUrl = null;
+
+function log(m) {
+  logEl.textContent += '[' + new Date().toLocaleTimeString('tr-TR') + '] ' + m + '\n';
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function fmt(b) {
+  if (b == null || isNaN(b)) return '?';
+  const u = ['B', 'KB', 'MB', 'GB', 'TB']; let i = 0;
+  while (b >= 1024 && i < 4) { b /= 1024; i++; }
+  return b.toFixed(i > 1 ? 2 : 0) + ' ' + u[i];
+}
+function setProg(p) { $('prog').value = p; }
+function makeBase(n) {
+  const b = new Uint8Array(n);
+  for (let o = 0; o < n; o += 65536) crypto.getRandomValues(b.subarray(o, Math.min(o + 65536, n)));
+  return b;
+}
+
+/* ---------- Worker ---------- */
+let worker = null;
+function getWorker() {
+  if (worker) return worker;
+  const src = $('wsrc').textContent;
+  worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+  worker.onmessage = e => {
+    const d = e.data;
+    if (d.type === 'log') log(d.m);
+    else if (d.type === 'prog') setProg(d.p);
+    else if (d.type === 'done' && curRes) { const r = curRes; curRes = null; r(d); }
+  };
+  worker.onerror = e => {
+    log('WORKER HATASI: ' + (e.message || 'bilinmiyor'));
+    if (curRes) { const r = curRes; curRes = null; r({ ok: false }); }
+  };
+  return worker;
+}
+function wcall(msg) {
+  return new Promise(res => { curRes = res; getWorker().postMessage(msg); });
+}
+
+/* ---------- Çalıştırıcı ---------- */
+async function run(name, fn) {
+  if (busy) return;
+  busy = true;
+  document.querySelectorAll('button').forEach(b => { if (b.id !== 'bCopy') b.disabled = true; });
+  setProg(0);
+  log('--- ' + name + ' başladı ---');
+  try { if (navigator.wakeLock) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
+  try { await fn(); } catch (e) { log('HATA: ' + (e && e.name) + ' - ' + (e && e.message)); }
+  try { wakeLock && wakeLock.release(); } catch (e) {}
+  log('--- ' + name + ' bitti ---');
+  busy = false;
+  document.querySelectorAll('button').forEach(b => b.disabled = false);
+  info();
+}
+
+/* ---------- Bilgi ---------- */
+async function info() {
+  const standalone = window.navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+  let est = {}, pers = '?';
+  try { est = await navigator.storage.estimate(); } catch (e) {}
+  try { pers = await navigator.storage.persisted(); } catch (e) {}
+  const has = !!(navigator.storage && navigator.storage.getDirectory);
+  const rows = [
+    ['Çalışma modu', standalone ? '<span class="good">Ana ekran uygulaması</span>' : '<span class="warn">Safari sekmesi</span>'],
+    ['Kota (origin)', fmt(est.quota)],
+    ['Kullanım', fmt(est.usage)],
+    ['Kalıcı depolama (persisted)', pers === true ? '<span class="good">EVET</span>' : pers === false ? '<span class="bad">hayır</span>' : '?'],
+    ['OPFS desteği', has ? '<span class="good">var</span>' : '<span class="bad">yok</span>'],
+    ['Şifreleme (WebCrypto)', (window.crypto && crypto.subtle) ? '<span class="good">var</span>' : '<span class="bad">yok (HTTPS gerekli)</span>'],
+    ['Adres', location.origin],
+    ['Tarayıcı', navigator.userAgent.replace(/\s+/g, ' ').slice(0, 90)]
+  ];
+  $('info').innerHTML = rows.map(r => '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td></tr>').join('');
+  $('standaloneWarn').style.display = standalone ? 'none' : 'block';
+  window.__lastInfo = { standalone, quota: est.quota, usage: est.usage, persisted: pers, ua: navigator.userAgent };
+}
+
+/* ---------- IndexedDB testi ---------- */
+async function idbTest(mb) {
+  const n = Math.ceil(mb * 1048576 / CH);
+  await new Promise(r => { const q = indexedDB.deleteDatabase('fz0'); q.onsuccess = q.onerror = q.onblocked = () => r(); });
+  const db = await new Promise((res, rej) => {
+    const r = indexedDB.open('fz0', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('c');
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+  const base = makeBase(CH), dv = new DataView(base.buffer);
+  let i = 0, ok = true;
+  const t0 = performance.now();
+  try {
+    for (i = 0; i < n; i++) {
+      dv.setUint32(0, i);
+      await new Promise((res, rej) => {
+        const tx = db.transaction('c', 'readwrite');
+        tx.objectStore('c').put(base, i);
+        tx.oncomplete = () => res();
+        tx.onerror = () => rej(tx.error);
+        tx.onabort = () => rej(tx.error || new Error('işlem iptal edildi'));
+      });
+      setProg((i + 1) / n);
+    }
+  } catch (e) {
+    ok = false;
+    log('HATA yazma sırasında (parça ' + (i + 1) + '/' + n + ', ~' + Math.round(i * CH / 1048576) + ' MB): ' + (e && e.name) + ' - ' + (e && e.message));
+  }
+  const t = (performance.now() - t0) / 1000;
+  if (ok) log('Yazma tamam: ' + mb + ' MB, ' + t.toFixed(1) + ' sn, ' + (mb / t).toFixed(0) + ' MB/sn');
+  let bad = 0;
+  const written = ok ? n : i;
+  try {
+    for (let k = 0; k < written; k++) {
+      const v = await new Promise((res, rej) => {
+        const r = db.transaction('c').objectStore('c').get(k);
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => rej(r.error);
+      });
+      const a = new Uint8Array(v.buffer || v);
+      if (a.length !== CH || new DataView(a.buffer, a.byteOffset).getUint32(0) !== k) { bad++; continue; }
+      for (let o = 4096; o < CH; o += 4096) { if (a[o] !== base[o]) { bad++; break; } }
+      setProg((k + 1) / written);
+    }
+    log(bad === 0 ? 'Doğrulama: tüm parçalar doğru.' : 'Doğrulama: ' + bad + ' BOZUK PARÇA!');
+  } catch (e) { log('Doğrulama hatası: ' + (e && e.name) + ' - ' + (e && e.message)); }
+  db.close();
+  await new Promise(r => { const q = indexedDB.deleteDatabase('fz0'); q.onsuccess = q.onerror = q.onblocked = () => r(); });
+  log('IndexedDB test verisi silindi.');
+}
+
+/* ---------- Şifreleme testi ---------- */
+async function cryptoTest() {
+  if (!(window.crypto && crypto.subtle)) { log('WebCrypto yok (HTTPS gerekli).'); return; }
+  const enc = new TextEncoder();
+  const km = await crypto.subtle.importKey('raw', enc.encode('test-parola'), 'PBKDF2', false, ['deriveKey']);
+  let t0 = performance.now();
+  const key = await crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: crypto.getRandomValues(new Uint8Array(16)), iterations: 600000, hash: 'SHA-256' },
+    km, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  log('Parola türetme (PBKDF2, 600.000 tur): ' + ((performance.now() - t0) / 1000).toFixed(2) + ' sn');
+  const data = makeBase(CH);
+  const cts = [];
+  t0 = performance.now();
+  for (let i = 0; i < 8; i++) {
+    const iv = new Uint8Array(12); new DataView(iv.buffer).setUint32(8, i);
+    cts.push(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, data));
+    setProg((i + 1) / 16);
+  }
+  let t = (performance.now() - t0) / 1000;
+  log('AES-GCM şifreleme: 64 MB, ' + t.toFixed(2) + ' sn (' + (64 / t).toFixed(0) + ' MB/sn)');
+  t0 = performance.now();
+  for (let i = 0; i < 8; i++) {
+    const iv = new Uint8Array(12); new DataView(iv.buffer).setUint32(8, i);
+    await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cts[i]);
+    setProg((i + 9) / 16);
+  }
+  t = (performance.now() - t0) / 1000;
+  log('AES-GCM çözme: 64 MB, ' + t.toFixed(2) + ' sn (' + (64 / t).toFixed(0) + ' MB/sn)');
+}
+
+/* ---------- Düğmeler ---------- */
+$('bRefresh').onclick = info;
+$('bPersist').onclick = () => run('persist() isteği', async () => {
+  if (!(navigator.storage && navigator.storage.persist)) { log('persist() desteklenmiyor.'); return; }
+  const r = await navigator.storage.persist();
+  log('persist() sonucu: ' + (r ? 'VERİLDİ' : 'verilmedi'));
+  log('persisted() şimdi: ' + (await navigator.storage.persisted()));
+});
+$('bOpfs').onclick = () => run('OPFS testi (' + $('size').value + ' MB)', async () => {
+  if (!(navigator.storage && navigator.storage.getDirectory)) { log('OPFS desteklenmiyor.'); return; }
+  await wcall({ cmd: 'opfs', mb: +$('size').value, keep: false });
+});
+$('bIdb').onclick = () => run('IndexedDB testi (' + $('size').value + ' MB)', () => idbTest(+$('size').value));
+$('bCrypto').onclick = () => run('Şifreleme testi', cryptoTest);
+$('bKeep').onclick = () => run('İşaret dosyası (100 MB)', async () => {
+  await wcall({ cmd: 'opfs', mb: 100, keep: true });
+});
+$('bKeepCheck').onclick = () => run('İşaret dosyası kontrolü', async () => { await wcall({ cmd: 'keepCheck' }); });
+$('bVideo').onclick = () => run('Video testi', async () => {
+  const f = $('vfile').files[0];
+  if (!f) { log('Önce bir video seç.'); return; }
+  const r = await wcall({ cmd: 'video', file: f });
+  if (r && r.ok && r.blob) {
+    if (vidUrl) URL.revokeObjectURL(vidUrl);
+    vidUrl = URL.createObjectURL(r.blob);
+    const v = $('vid');
+    v.src = vidUrl; v.style.display = 'block';
+    v.onerror = () => log('Video oynatma HATASI (kod: ' + (v.error && v.error.code) + ')');
+    v.onloadeddata = () => log('Video yüklendi, oynatmayı dene. Başa/sona sar, 1-2 dakika izle.');
+    log('Çözülmüş video hazır (' + fmt(r.blob.size) + '). Aşağıdaki oynatıcıdan dene.');
+    $('vid').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+});
+$('bClean').onclick = () => run('Temizleme', async () => {
+  await wcall({ cmd: 'clean' });
+  try { await new Promise(r => { const q = indexedDB.deleteDatabase('fz0'); q.onsuccess = q.onerror = q.onblocked = () => r(); }); } catch (e) {}
+  if (vidUrl) { URL.revokeObjectURL(vidUrl); vidUrl = null; $('vid').removeAttribute('src'); $('vid').style.display = 'none'; }
+});
+$('bCopy').onclick = async () => {
+  const i = window.__lastInfo || {};
+  const head = 'Mod: ' + (i.standalone ? 'ana ekran' : 'Safari sekmesi') + ' | Kota: ' + fmt(i.quota) + ' | Kullanım: ' + fmt(i.usage) +
+    ' | persisted: ' + i.persisted + '\nUA: ' + i.ua + '\n\n';
+  try { await navigator.clipboard.writeText(head + logEl.textContent); alert('Kopyalandı. Sohbete yapıştır.'); }
+  catch (e) { const r = document.createRange(); r.selectNodeContents(logEl); const s = getSelection(); s.removeAllRanges(); s.addRange(r); alert('Metin seçildi; elle kopyala.'); }
+};
+
+if ('serviceWorker' in navigator) { /* Faz 0'da gerekmez */ }
+info();
+log('Hazır. Önce ana ekrana ekleyip oradan aç, sonra testleri sırayla çalıştır.');
+</script>
+</body>
+</html>
